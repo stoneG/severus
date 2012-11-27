@@ -99,7 +99,9 @@ class Server(object):
             get_request = self.generate_header(200) + f_requested
         except IOError:
             print 'CODE: 404'
-            get_request = self.generate_header(404)
+            f = open(self.www_dir+'/fourohfour.html', 'r')
+            f_requested = f.read()
+            get_request = self.generate_header(404) + f_requested
 
         get_request = get_request.encode('utf-8')
         print 'Serving GET request'
