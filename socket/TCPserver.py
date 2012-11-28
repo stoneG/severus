@@ -1,6 +1,7 @@
 import os
 import socket
 import sys
+import pdb
 import time
 
 """
@@ -15,10 +16,24 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
 Accept-Encoding: gzip,deflate,sdch
 Accept-Language: en-US,en;q=0.8
 Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.3
+
+EXAMPLE OF A POST REQUEST
+=========================
+POST / HTTP/1.1
+TE: deflate,gzip;q=0.3
+Connection: TE, close
+Host: 127.0.0.1:13373
+User-Agent: lwp-request/6.03 libwww-perl/6.03
+Content-Length: 57
+Content-Type: application/x-www-form-urlencoded
+
+[POST TEXT]
+
 """
 class Page(object):
     def __init__(self):
         self.img_exts = ['ico', 'png', 'jpg', 'jpeg', 'gif']
+        self.content_type = ['application/x-www-form-urlencoded', 'application/json']
 
 
 class Server(object):
@@ -54,9 +69,9 @@ class Server(object):
 
     def listen(self):
         """Listen for requests on a TCP, IPv4 Socket."""
+        self.socket.listen(3)
         while True:
             print '\nWaiting for connection'
-            self.socket.listen(3)
             conn, addr = self.socket.accept()
             pid = os.fork()
             if pid == 0:
@@ -69,13 +84,16 @@ class Server(object):
 
                 if request == 'GET' or request == 'HEAD':
                     self.GET(conn, addr, msg)
+                elif request == 'POST':
+                    self.POST(conn, addr, msg)
                 else:
                     print 'Unknown HTTP request.'
                 os._exit(0)
             else:
+                conn.close()
                 continue
 
-    def header(self, code):
+    def generate_header(self, code):
         current_date = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
         if code == 200:
             h = 'HTTP/1.1 200 OK\n'
@@ -85,8 +103,8 @@ class Server(object):
         h += 'Connection: close\n\n'
         return h
 
-    def GET(self, conn, addr, msg):
-        """Responds to GET requests."""
+    def parse_url(self, msg, addr):
+        """Given a HTTP request, return the parsed url."""
         url_request = msg.split()[1]
         url_request = url_request.split('?')[0]
         print addr, 'is requesting', url_request
@@ -95,24 +113,61 @@ class Server(object):
             url_request = '/index.html' # default to index.html
 
         url_request = self.www_dir + url_request
+        return url_request
 
+    def GET(self, conn, addr, msg):
+        """Responds to GET requests."""
+        url_request = self.parse_url(msg, addr)
         try:
             f = open(url_request, 'r')
             f_requested = f.read()
             f.close()
             print 'CODE: 200'
-            get_request = self.header(200) + f_requested
+            get_request = self.generate_header(200) + f_requested
         except IOError:
             print 'CODE: 404'
             f = open(self.www_dir+'/fourohfour.html', 'r')
             f_requested = f.read()
-            get_request = self.header(404) + f_requested
+            get_request = self.generate_header(404) + f_requested
 
         if url_request.split('.')[1] not in self.page.img_exts:
             get_request = get_request.encode('utf-8')
         print 'Serving request'
         conn.send(get_request)
         print 'Closing connection'
+        conn.close()
+
+    def _POST_url(self, baseUrl, msg):
+        if 'eggs' in msg:
+            if 'eggs=scrambled' == msg:
+                requested_file = baseUrl + '?' + msg
+            else:
+                requested_file = baseUrl + '?eggs=else'
+        return requested_file
+
+    def POST(self, conn, addr, msg):
+        """Prints POST request data to console."""
+        url_request = self.parse_url(msg, addr)
+        header = msg.split('\r\n\r\n')[0]
+        for content_type in self.page.content_type:
+            if content_type in header:
+                post_type = content_type
+                message = msg.replace(header,'')[4:]
+                print 'POST Content_Type:', post_type
+                print message
+                print 'CODE: 200'
+                f = open(self._POST_url(url_request, message), 'r')
+                f_requested = f.read()
+                f.close()
+                post_request = self.generate_header(200) + f_requested
+                conn.send(post_request)
+                conn.close()
+                return
+        print 'POST Content_Type not recognized'
+        print message
+        print 'CODE: 404'
+        post_request = self.generate_header(404)
+        conn.send(post_request)
         conn.close()
 
 def main():
