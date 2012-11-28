@@ -15,7 +15,6 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
 Accept-Encoding: gzip,deflate,sdch
 Accept-Language: en-US,en;q=0.8
 Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.3
-Cookie: splashShown1.6=1; JSESSIONID=159lh3e376hkcvet60o8ibsq4
 """
 
 class Server(object):
@@ -31,9 +30,11 @@ class Server(object):
         Passes to listen() method.
         """
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         while self.automatic_ports:
             try:
                 print 'Running server on %s:%d' % (self.host, self.port)
+
                 self.socket.bind((self.host, self.port))
                 print 'Now listening on', self.socket.getsockname()
             except Exception as e:
@@ -50,30 +51,33 @@ class Server(object):
         """Listen for requests on a TCP, IPv4 Socket."""
         while True:
             print '\nWaiting for connection'
-            self.socket.listen(1)
+            self.socket.listen(3)
             conn, addr = self.socket.accept()
-            print 'Accepted connection from:', addr
+            pid = os.fork()
+            if pid == 0:
+                print 'Accepted connection from:', addr
 
-            msg = conn.recv(1024)
-            msg = msg.decode()
-            request = msg.split()[0]
-            print '\nHTTP Request:', request
+                msg = conn.recv(1024)
+                msg = msg.decode()
+                request = msg.split()[0]
+                print '\nHTTP Request:', request
 
-            if request == 'GET':
-                self.GET(conn, addr, msg)
+                if request == 'GET' or request == 'HEAD':
+                    self.GET(conn, addr, msg)
+                else:
+                    print 'Unknown HTTP request.'
+                os._exit(0)
             else:
-                print 'Unknown HTTP request.'
+                continue
 
-    def generate_header(self, code):
+    def header(self, code):
         current_date = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
         if code == 200:
             h = 'HTTP/1.1 200 OK\n'
-            h += 'Date: ' + current_date +'\n'
-            h += 'Connection: close\n\n'
         elif code == 404:
             h = 'HTTP/1.1 404 Not Found\n'
-            h += 'Date: ' + current_date +'\n'
-            h += 'Connection: close\n\n'
+        h += 'Date: ' + current_date +'\n'
+        h += 'Connection: close\n\n'
         return h
 
     def GET(self, conn, addr, msg):
@@ -96,15 +100,15 @@ class Server(object):
             f_requested = f.read()
             f.close()
             print 'CODE: 200'
-            get_request = self.generate_header(200) + f_requested
+            get_request = self.header(200) + f_requested
         except IOError:
             print 'CODE: 404'
             f = open(self.www_dir+'/fourohfour.html', 'r')
             f_requested = f.read()
-            get_request = self.generate_header(404) + f_requested
+            get_request = self.header(404) + f_requested
 
         get_request = get_request.encode('utf-8')
-        print 'Serving GET request'
+        print 'Serving request'
         conn.send(get_request)
         print 'Closing connection'
         conn.close()
