@@ -16,6 +16,10 @@ Accept-Encoding: gzip,deflate,sdch
 Accept-Language: en-US,en;q=0.8
 Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.3
 """
+class Page(object):
+    def __init__(self):
+        self.img_exts = ['ico', 'png', 'jpg', 'jpeg', 'gif']
+
 
 class Server(object):
     def __init__(self, host='127.0.0.1', port=80):
@@ -24,6 +28,7 @@ class Server(object):
         ports = [80, 8080, 'end']
         self.automatic_ports = [p for p in ports if p != port]
         self.www_dir = 'TCPserver'
+        self.page = Page()
 
     def run(self):
         """Binds socket to self.port or one of the self.automatic_ports.
@@ -88,10 +93,6 @@ class Server(object):
 
         if url_request == '/':
             url_request = '/index.html' # default to index.html
-        elif url_request.split('.')[1] in ['ico']:
-            print 'ignoring favicon.ico request'
-            conn.close()
-            return
 
         url_request = self.www_dir + url_request
 
@@ -107,7 +108,8 @@ class Server(object):
             f_requested = f.read()
             get_request = self.header(404) + f_requested
 
-        get_request = get_request.encode('utf-8')
+        if url_request.split('.')[1] not in self.page.img_exts:
+            get_request = get_request.encode('utf-8')
         print 'Serving request'
         conn.send(get_request)
         print 'Closing connection'
