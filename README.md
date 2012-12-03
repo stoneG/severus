@@ -1,4 +1,5 @@
-Severus![alt text](https://raw.github.com/stoneG/severus/master/potion.png "This is more interesting then a picture of a server")
+![alt text](https://raw.github.com/stoneG/severus/master/potion.png "This is more interesting then a picture of a server")
+Severus
 =======
 a study in implementing different levels of python server abstractions. Named
 after the [late wizard](http://en.wikipedia.org/wiki/Severus_Snape) that always served Mr. Potter a piece of his mind.
